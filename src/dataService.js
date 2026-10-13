@@ -68,43 +68,46 @@ export async function getAppSettings() {
   return { ...fallback, ...(row?.data || {}) };
 }
 
-let gradingRpcMissing = false;
+const OMR_LIGHT_SELECT = [
+  'id',
+  'score:data->score',
+  'total:data->total',
+  'percentage:data->percentage',
+  'studentId:data->studentId',
+  'studentName:data->studentName',
+  'nationalId:data->nationalId',
+  'national_id:data->national_id',
+  'seatNumber:data->seatNumber',
+  'classroom:data->classroom',
+  'studentGrade:data->studentGrade',
+  'assignedStudentId:data->assignedStudentId',
+  'approved:data->approved',
+  'confirmed:data->confirmed',
+  'approvedAt:data->approvedAt',
+  'timestamp:data->timestamp',
+  'manualEntry:data->manualEntry',
+  'enteredBy:data->enteredBy',
+  'audit:data->audit',
+  'examId:data->examId',
+  'examTitle:data->examTitle',
+  'subject:data->subject',
+  'phone:data->phone',
+].join(',');
 
-/** كل النتائج بدون صور (الصور تُحذف على السيرفر) — يُرجع null إن لم تكن دالة RPC منشأة */
 export async function getAllResultsLight() {
-  if (gradingRpcMissing) return null;
-  const pageSize = 200;
-  const all = [];
-  for (let offset = 0; ; offset += pageSize) {
-    try {
-      const rows = await withRetry('جلب النتائج', () =>
-        supabase.rpc('fetch_omr_results_grading_page', { p_limit: pageSize, p_offset: offset })
-      );
-      all.push(...(rows || []).map((r) => ({ id: r.id, ...(r.payload || {}) })));
-      if (!rows || rows.length < pageSize) return all;
-    } catch (err) {
-      if (err.code === 'PGRST202' || String(err.message).includes('fetch_omr_results_grading_page')) {
-        gradingRpcMissing = true;
-        return null;
-      }
-      throw err;
-    }
-  }
+  return null;
 }
 
-/** نتائج اختبار واحد (عند غياب دالة RPC) — الصور تُحذف بعد الجلب */
+/** نتائج اختبار واحد — استعلام سريع وخفيف ومفهرس على الـ ID بدون نقل صور الورقة الثقيلة */
 export async function getExamResults(exam) {
-  const queries = [
-    withRetry('جلب النتائج', () => supabase.from('omr_results').select('id, data').eq('data->>examId', String(exam.id))),
-  ];
-  if (exam.title) {
-    queries.push(withRetry('جلب النتائج', () => supabase.from('omr_results').select('id, data').eq('data->>examTitle', String(exam.title))));
-  }
-  const byId = new Map();
-  (await Promise.all(queries)).flat().forEach((row) => {
-    if (row) byId.set(row.id, withoutKeys(mapRow(row), IMAGE_KEYS));
-  });
-  return [...byId.values()];
+  if (!exam?.id) return [];
+  const rows = await withRetry('جلب نتائج الاختبار', () =>
+    supabase
+      .from('omr_results')
+      .select(OMR_LIGHT_SELECT)
+      .like('id', `omr_${exam.id}_%`)
+  );
+  return rows || [];
 }
 
 export async function saveResult(result) {

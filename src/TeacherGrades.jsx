@@ -55,7 +55,6 @@ function GradeEntry({ teacher, notify }) {
   const [students, setStudents] = useState([]);
   const [exams, setExams] = useState([]);
   const [results, setResults] = useState([]);
-  const [perExamMode, setPerExamMode] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadingExam, setLoadingExam] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -87,15 +86,9 @@ function GradeEntry({ teacher, notify }) {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [s, e, r] = await Promise.all([getStudents(), getExams(), getAllResultsLight()]);
+      const [s, e] = await Promise.all([getStudents(), getExams()]);
       setStudents(s || []);
       setExams((e || []).filter((x) => !isArchived(x)));
-      if (r === null) {
-        setPerExamMode(true);
-        if (exam) await loadExamResults(exam);
-      } else {
-        setResults(r);
-      }
     } catch (err) {
       console.error(err);
       notify('error', 'فشل تحميل البيانات. تحقق من الاتصال.');
@@ -107,8 +100,12 @@ function GradeEntry({ teacher, notify }) {
   useEffect(() => { loadData(); }, []);
 
   useEffect(() => {
-    if (perExamMode && exam) loadExamResults(exam);
-  }, [perExamMode, exam?.id]);
+    if (exam) {
+      loadExamResults(exam);
+    } else {
+      setResults([]);
+    }
+  }, [exam?.id]);
 
   const dirtyCount = Object.keys(edits).length;
   const confirmDiscard = () => dirtyCount === 0 || window.confirm('توجد درجات غير معتمدة. هل تريد تجاهلها؟');
