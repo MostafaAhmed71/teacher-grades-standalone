@@ -113,7 +113,7 @@ export async function getExamResults(exam) {
 export async function saveResult(result) {
   const persisted = enrichOmrResultForSave(result);
   await withRetry('حفظ الدرجة', () =>
-    supabase.from('omr_results').upsert({ id: String(persisted.id), data: withoutKeys(persisted, STRIP_ON_SAVE) })
+    supabase.from('omr_results').upsert({ id: String(persisted.id), data: withoutKeys(persisted, [...STRIP_ON_SAVE, ...IMAGE_KEYS]) })
   );
   return persisted;
 }
